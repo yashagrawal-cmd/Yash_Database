@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ticket Pendency Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:#252a3a;
+  --accent:#f97316;--accent2:#3b82f6;--accent3:#10b981;--accent4:#a855f7;
+  --warn:#ef4444;--text:#e2e8f0;--muted:#64748b;
+  --green:#22c55e;--yellow:#eab308;--red:#ef4444;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── Upload Screen ── */
+#uploadScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:40px;}
+.upload-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:48px 56px;max-width:560px;width:100%;text-align:center;position:relative;overflow:hidden;}
+.upload-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3));}
+.upload-logo{width:60px;height:60px;background:linear-gradient(135deg,var(--accent),#ea580c);
+  border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:22px;color:#fff;margin:0 auto 24px;
+  box-shadow:0 8px 24px rgba(249,115,22,.3);}
+.upload-title{font-size:24px;font-weight:700;margin-bottom:8px;}
+.upload-sub{font-size:13px;color:var(--muted);margin-bottom:36px;line-height:1.6;}
+.drop-zone{border:2px dashed var(--border);border-radius:14px;padding:40px 24px;
+  cursor:pointer;transition:all .2s;position:relative;background:var(--surface2);}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:rgba(249,115,22,.06);}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-icon{font-size:40px;margin-bottom:14px;}
+.drop-text{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.drop-sub{font-size:12px;color:var(--muted);}
+.upload-btn{display:inline-flex;align-items:center;gap:8px;margin-top:24px;padding:12px 28px;
+  background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;
+  font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .2s;
+  box-shadow:0 4px 14px rgba(249,115,22,.3);}
+.upload-btn:hover{background:#ea580c;transform:translateY(-1px);}
+.upload-hint{margin-top:20px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.processing-msg{display:none;margin-top:20px;font-size:13px;color:var(--accent3);
+  font-family:'DM Mono',monospace;}
+.error-msg{display:none;margin-top:16px;padding:12px 16px;border-radius:8px;
+  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+  color:#f87171;font-size:12px;text-align:left;}
+.supported-note{margin-top:24px;padding:12px 16px;border-radius:8px;
+  background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);
+  font-size:11px;color:var(--muted);text-align:left;line-height:1.7;}
+.supported-note strong{color:var(--accent2);}
+
+/* ── Dashboard ── */
+#dashboard{display:none;}
+.header{background:linear-gradient(135deg,#0d0f14 0%,#151a2e 50%,#0d0f14 100%);
+  border-bottom:1px solid var(--border);padding:18px 32px;display:flex;
+  align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header-left{display:flex;align-items:center;gap:14px;}
+.logo-dot{width:36px;height:36px;background:var(--accent);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;}
+.header h1{font-size:18px;font-weight:700;}
+.header p{font-size:12px;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.badge-live{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);
+  color:var(--green);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;
+  font-family:'DM Mono',monospace;display:flex;align-items:center;gap:5px;}
+.badge-live::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.date-badge{background:var(--surface2);border:1px solid var(--border);padding:4px 12px;
+  border-radius:6px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.new-file-btn{background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.35);
+  color:var(--accent);padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;
+  font-family:'DM Mono',monospace;cursor:pointer;transition:all .2s;}
+.new-file-btn:hover{background:rgba(249,115,22,.22);}
+.main{padding:24px 32px;max-width:1600px;margin:0 auto;}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;min-height:90px;}
+.kpi:hover{border-color:var(--accent);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi.orange::before{background:linear-gradient(90deg,var(--accent),transparent);}
+.kpi.blue::before{background:linear-gradient(90deg,var(--accent2),transparent);}
+.kpi.green::before{background:linear-gradient(90deg,var(--accent3),transparent);}
+.kpi.purple::before{background:linear-gradient(90deg,var(--accent4),transparent);}
+.kpi.red::before{background:linear-gradient(90deg,var(--warn),transparent);}
+.kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}
+.kpi-value{font-size:32px;font-weight:700;font-family:'DM Mono',monospace;line-height:1;}
+.kpi.orange .kpi-value{color:var(--accent)}.kpi.blue .kpi-value{color:var(--accent2)}
+.kpi.green .kpi-value{color:var(--accent3)}.kpi.purple .kpi-value{color:var(--accent4)}
+.kpi.red .kpi-value{color:var(--warn)}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.section-header h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+.section-header .pill{font-size:10px;font-family:'DM Mono',monospace;background:var(--surface2);
+  border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:10px;}
+.divider{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.grid-1-2{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px;}
+.grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;}
+.card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.card-title span{width:8px;height:8px;border-radius:2px;display:inline-block;}
+.chart-wrap{position:relative;}
+.tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;padding:4px;width:fit-content;flex-wrap:wrap;}
+.tab{padding:8px 20px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .2s;color:var(--muted);border:none;background:transparent;
+  font-family:'Sora',sans-serif;letter-spacing:.3px;}
+.tab.active{background:var(--accent);color:#fff;}
+.tab:hover:not(.active){color:var(--text);}
+.page{display:none;}.page.active{display:block;}
+.l3-table-wrap{overflow-x:auto;}
+.l3-table{width:100%;border-collapse:collapse;font-size:12px;}
+.l3-table th{background:var(--surface2);color:var(--muted);text-align:left;
+  padding:10px 14px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;
+  font-size:10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.l3-table td{padding:10px 14px;border-bottom:1px solid rgba(37,42,58,.5);vertical-align:middle;}
+.l3-table tr:hover td{background:rgba(249,115,22,.04);}
+.l3-table tr:last-child td{border-bottom:none;}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  background:var(--surface2);border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+.rank-badge.top3{background:rgba(249,115,22,.2);color:var(--accent);}
+.l3-name{font-weight:500;max-width:200px;}
+.l1-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;
+  background:rgba(59,130,246,.15);color:var(--accent2);}
+.l2-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;
+  background:rgba(168,85,247,.12);color:var(--accent4);}
+.total-num{font-family:'DM Mono',monospace;font-weight:600;font-size:13px;color:var(--text);}
+.age-bar-mini{display:flex;gap:3px;align-items:center;min-width:180px;}
+.age-seg{height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-family:'DM Mono',monospace;color:rgba(255,255,255,.7);min-width:0;overflow:hidden;}
+.age-seg.a0{background:var(--green)}.age-seg.a1{background:var(--accent2)}
+.age-seg.a2{background:var(--yellow)}.age-seg.a3{background:var(--accent)}
+.age-seg.a4{background:var(--red)}.age-seg.a5{background:#7f1d1d}
+.status-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;}
+.status-label{width:160px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.status-bar-wrap{flex:1;background:var(--surface2);border-radius:4px;height:10px;}
+.status-bar{height:10px;border-radius:4px;}
+.status-count{width:50px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.queue-list{display:flex;flex-direction:column;gap:8px;}
+.queue-row{display:flex;align-items:center;gap:8px;font-size:11px;}
+.queue-name{width:170px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.queue-bar-wrap{flex:1;background:var(--surface2);border-radius:3px;height:8px;}
+.queue-bar{height:8px;border-radius:3px;}
+.queue-num{font-family:'DM Mono',monospace;color:var(--muted);font-size:10px;width:35px;text-align:right;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.heatmap-wrap{overflow-x:auto;}
+.heatmap{border-collapse:collapse;width:100%;font-size:11px;}
+.heatmap th{padding:8px 12px;color:var(--muted);font-weight:600;text-transform:uppercase;
+  letter-spacing:.5px;font-size:10px;text-align:center;white-space:nowrap;border-bottom:1px solid var(--border);}
+.heatmap th:first-child{text-align:left;}
+.heatmap td{padding:8px 12px;border-bottom:1px solid rgba(37,42,58,.4);text-align:center;
+  font-family:'DM Mono',monospace;font-size:11px;}
+.heatmap td:first-child{text-align:left;font-family:'Sora',sans-serif;color:var(--text);font-size:11px;
+  max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.heatmap tr:hover td{background:rgba(249,115,22,.04);}
+.heat-cell{border-radius:4px;padding:4px 8px;display:inline-block;min-width:36px;}
+.sla-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+.sla-kpi{border-radius:12px;padding:16px 20px;position:relative;overflow:hidden;border:1px solid;}
+.sla-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.sla-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;opacity:.9;}
+.sla-value{font-size:30px;font-weight:700;font-family:'DM Mono',monospace;line-height:1;}
+.sla-sub{font-size:11px;margin-top:5px;opacity:.7;}
+.sla-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;
+  font-family:'DM Mono',monospace;margin-left:8px;vertical-align:middle;}
+.dl-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;
+  font-size:11px;font-weight:600;font-family:'DM Mono',monospace;cursor:pointer;
+  border:1px solid;text-decoration:none;transition:opacity .15s;background:transparent;}
+.dl-btn:hover{opacity:.8;}
+/* SLA tab */
+.tab-sla{background:rgba(99,102,241,.1)!important;color:#818cf8!important;border:1px solid rgba(99,102,241,.3)!important;}
+.tab-sla.active{background:#6366f1!important;color:#fff!important;border-color:transparent!important;}
+.tab-reopen{background:rgba(59,130,246,.1)!important;color:#60a5fa!important;border:1px solid rgba(59,130,246,.3)!important;}
+.tab-reopen.active{background:#3b82f6!important;color:#fff!important;border-color:transparent!important;}
+.sla-tab-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px;flex-wrap:wrap;}
+.sla-sub-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+.sla-sub-tab{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;
+  font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);
+  background:var(--surface2);color:var(--muted);font-family:'Sora',sans-serif;transition:all .2s;white-space:nowrap;}
+.sla-sub-tab:hover{color:var(--text);}
+.sla-sub-tab.active{background:var(--stc,var(--accent));color:#fff;border-color:transparent;
+  box-shadow:0 0 12px color-mix(in srgb,var(--stc,var(--accent)) 40%,transparent);}
+.sla-sub-count{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;
+  font-family:'DM Mono',monospace;background:rgba(255,255,255,.15);}
+.sla-view{display:none;}.sla-view.active{display:block;}
+.sla-view-kpi{border:1px solid;border-radius:12px;padding:16px 22px;margin-bottom:18px;}
+.grid-sla-view{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.sla-qlist{display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;padding-right:4px;}
+.sla-qrow{display:flex;align-items:center;gap:8px;font-size:11px;}
+.sla-qrank{width:22px;height:22px;border-radius:5px;background:var(--surface2);display:flex;
+  align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);flex-shrink:0;}
+.sla-qrank.top3{background:rgba(249,115,22,.2);color:var(--accent);}
+.sla-qname{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sla-qbar-wrap{width:120px;background:var(--surface2);border-radius:3px;height:8px;flex-shrink:0;}
+.sla-qbar{height:8px;border-radius:3px;}
+.sla-qnum{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;width:40px;text-align:right;flex-shrink:0;}
+.sla-qpct{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);width:36px;text-align:right;flex-shrink:0;}
+/* Ageing filter */
+.age-filter-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 14px;
+  padding:10px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);}
+.age-filter-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;}
+.age-filter-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.age-filter-btn{padding:5px 13px;border-radius:6px;border:1px solid var(--border);
+  background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .18s;font-family:'Sora',sans-serif;white-space:nowrap;}
+.age-filter-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(249,115,22,.1);}
+.age-filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 2px 8px rgba(249,115,22,.35);}
+.age-filter-info{margin-left:auto;font-size:11px;color:var(--muted);font-style:italic;white-space:nowrap;}
+.age-pend-wrap{overflow-x:auto;border-radius:10px;}
+.age-pend-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.age-pend-table th{background:var(--surface2);color:var(--muted);padding:9px 12px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:10px;
+  border-bottom:1px solid var(--border);text-align:center;position:sticky;top:0;z-index:2;}
+.age-pend-table th:first-child{text-align:left;position:sticky;left:0;z-index:3;background:var(--surface2);}
+.age-pend-table th.total-col{color:var(--accent);background:rgba(249,115,22,.12);}
+.age-pend-table td{padding:8px 12px;border-bottom:1px solid rgba(37,42,58,.45);
+  text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.age-pend-table td:first-child{text-align:left;font-family:'Sora',sans-serif;color:var(--text);font-size:11px;
+  font-weight:500;max-width:190px;overflow:hidden;text-overflow:ellipsis;
+  position:sticky;left:0;background:var(--surface);z-index:1;}
+.age-pend-table td.total-col{color:var(--accent);font-weight:700;background:rgba(249,115,22,.06);}
+.age-pend-table tr:hover td{background:rgba(249,115,22,.04);}
+.age-pend-table tr:hover td:first-child{background:rgba(249,115,22,.08);}
+.age-pend-table tr:last-child td{border-bottom:none;}
+.age-cell-val{display:inline-block;padding:2px 6px;border-radius:4px;min-width:28px;
+  text-align:center;font-weight:600;font-size:11px;}
+.age-cell-0{color:var(--muted);}
+.age-cell-1{background:rgba(34,197,94,.18);color:#4ade80;}
+.age-cell-2{background:rgba(34,197,94,.30);color:#4ade80;}
+.age-cell-3{background:rgba(234,179,8,.22);color:#fbbf24;}
+.age-cell-4{background:rgba(249,115,22,.25);color:#fb923c;}
+.age-cell-5{background:rgba(239,68,68,.28);color:#f87171;}
+.age-cell-6{background:rgba(239,68,68,.45);color:#fca5a5;font-weight:800;}
+.rank-num{display:inline-flex;align-items:center;justify-content:center;
+  width:20px;height:20px;border-radius:4px;background:var(--surface2);
+  font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-right:7px;flex-shrink:0;vertical-align:middle;}
+.rank-num.top3{background:rgba(249,115,22,.2);color:var(--accent);}
+.grand-total-row td{border-top:2px solid var(--accent);border-bottom:none;background:rgba(249,115,22,.07)!important;}
+.grand-total-label{font-family:'Sora',sans-serif!important;font-size:12px!important;font-weight:700!important;
+  color:var(--accent)!important;text-transform:uppercase;letter-spacing:.6px;}
+.grand-total-cell{font-family:'DM Mono',monospace;font-weight:700;}
+.age-grand-val{display:inline-block;padding:2px 6px;border-radius:4px;min-width:28px;
+  text-align:center;font-weight:700;font-size:11px;background:rgba(249,115,22,.22);color:var(--accent);}
+.kpi-dl-btn{position:absolute;bottom:12px;right:14px;color:var(--accent);border:1px solid rgba(249,115,22,.4);
+  background:rgba(249,115,22,.1);padding:3px 10px;border-radius:5px;font-size:10px;font-weight:600;
+  text-decoration:none;font-family:"DM Mono",monospace;transition:opacity .2s;white-space:nowrap;cursor:pointer;}
+.kpi-dl-btn:hover{opacity:.75;}
+/* Reopen */
+.reopen-kpi-banner{border-radius:12px;padding:18px 24px;margin-bottom:20px;
+  background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.reopen-kpi-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#60a5fa;margin-bottom:4px;}
+.reopen-kpi-value{font-size:34px;font-weight:700;font-family:'DM Mono',monospace;color:#3b82f6;line-height:1;}
+.reopen-kpi-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.reopen-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.reopen-list{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow-y:auto;padding-right:4px;}
+.reopen-row{display:flex;align-items:center;gap:8px;font-size:11px;}
+.reopen-rank{width:22px;height:22px;border-radius:5px;background:var(--surface2);display:flex;
+  align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);flex-shrink:0;}
+.reopen-rank.top3{background:rgba(59,130,246,.2);color:#3b82f6;}
+.reopen-name{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.reopen-bar-wrap{width:120px;background:var(--surface2);border-radius:3px;height:8px;flex-shrink:0;}
+.reopen-bar{height:8px;border-radius:3px;background:#3b82f6;}
+.reopen-num{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;width:40px;text-align:right;flex-shrink:0;color:#3b82f6;}
+.reopen-pct{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);width:38px;text-align:right;flex-shrink:0;}
+/* Actionable */
+.tab-action{background:rgba(16,185,129,.1)!important;color:#34d399!important;border:1px solid rgba(16,185,129,.3)!important;}
+.tab-action.active{background:#10b981!important;color:#fff!important;border-color:transparent!important;}
+.action-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px;
+  padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);}
+.action-filter-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.action-filter-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.af-btn{padding:5px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;font-family:'Sora',sans-serif;}
+.af-btn:hover{border-color:var(--accent3);color:var(--accent3);background:rgba(16,185,129,.08);}
+.af-btn.active{background:var(--accent3);color:#fff;border-color:var(--accent3);box-shadow:0 2px 8px rgba(16,185,129,.35);}
+.af-btn[data-p="CRITICAL"].active{background:#ef4444;border-color:#ef4444;box-shadow:0 2px 8px rgba(239,68,68,.35);}
+.af-btn[data-p="HIGH"].active{background:#eab308;border-color:#eab308;box-shadow:0 2px 8px rgba(234,179,8,.35);color:#000;}
+.af-btn[data-p="MEDIUM"].active{background:#3b82f6;border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.35);}
+.af-btn[data-p="LOW"].active{background:#22c55e;border-color:#22c55e;box-shadow:0 2px 8px rgba(34,197,94,.35);}
+.action-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+.action-kpi{border-radius:12px;padding:16px 20px;border:1px solid;}
+.action-kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.action-kpi-value{font-size:28px;font-weight:700;font-family:'DM Mono',monospace;margin-bottom:4px;}
+.action-kpi-sub{font-size:10px;color:var(--muted);}
+.action-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:10px;overflow:hidden;transition:border-color .2s;}
+.action-item:hover{border-color:rgba(249,115,22,.3);}
+.action-item-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;flex-wrap:wrap;}
+.action-l3-name{font-weight:600;font-size:13px;flex:1;min-width:120px;}
+.action-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.action-meta-chip{padding:2px 8px;border-radius:6px;background:var(--surface2);font-size:10px;
+  font-family:'DM Mono',monospace;color:var(--muted);}
+.action-chevron{margin-left:auto;font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0;}
+.action-item.open .action-chevron{transform:rotate(180deg);}
+.action-body{display:none;padding:0 18px 18px;}
+.action-item.open .action-body{display:block;}
+.action-text-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:12px 16px;font-size:12px;line-height:1.7;margin-bottom:14px;color:var(--text);}
+.action-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.action-case-section{background:var(--surface2);border-radius:8px;padding:12px 14px;}
+.action-case-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
+.case-id-grid{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.case-chip{padding:2px 7px;border-radius:4px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);
+  color:var(--accent);font-size:10px;font-family:'DM Mono',monospace;}
+.priority-badge{padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;
+  font-family:'DM Mono',monospace;border:1px solid;flex-shrink:0;}
+.pb-CRITICAL{background:rgba(239,68,68,.15);color:#ef4444;border-color:rgba(239,68,68,.4);}
+.pb-HIGH{background:rgba(234,179,8,.12);color:#eab308;border-color:rgba(234,179,8,.35);}
+.pb-MEDIUM{background:rgba(59,130,246,.12);color:#3b82f6;border-color:rgba(59,130,246,.3);}
+.pb-LOW{background:rgba(34,197,94,.1);color:#22c55e;border-color:rgba(34,197,94,.3);}
+.age-mini-bar{display:flex;border-radius:4px;overflow:hidden;height:14px;margin-bottom:8px;}
+.age-mini-seg{display:flex;align-items:center;justify-content:center;font-size:8px;color:rgba(255,255,255,.7);min-width:0;overflow:hidden;}
+.theme-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;
+  background:rgba(168,85,247,.12);color:var(--accent4);border:1px solid rgba(168,85,247,.2);margin:2px;white-space:nowrap;}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:2px;}
+@media(max-width:1200px){.kpi-row{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}
+  .sla-row{grid-template-columns:1fr;}.grid-sla-view{grid-template-columns:1fr;}.reopen-grid{grid-template-columns:1fr;}}
+@media(max-width:900px){.action-detail-grid{grid-template-columns:1fr;}.action-summary-row{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ UPLOAD SCREEN ══════════════ -->
+<div id="uploadScreen">
+  <div class="upload-card">
+    <div class="upload-logo">LK</div>
+    <div class="upload-title">Ticket Pendency Dashboard</div>
+    <div class="upload-sub">Upload your Excel data file to generate the complete pendency report. All processing happens locally in your browser — no data is sent anywhere.</div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls" />
+      <div class="drop-icon">📂</div>
+      <div class="drop-text">Drop your Excel file here</div>
+      <div class="drop-sub">or click to browse</div>
+    </div>
+
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+      📁 Choose File
+    </button>
+
+    <div class="processing-msg" id="processingMsg">⏳ Processing your data…</div>
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="supported-note">
+      <strong>Expected sheet:</strong> <code>TicketPendencyCaseRaw-Creation</code> (or first sheet as fallback)<br>
+      <strong>Key columns:</strong> Case Creation Time · Case Number · Status (Case) · LK-Country (Case) · Mapping_L1/L2/L3 · Current/Last Work Queue · Backend Reopened Ticket · Count (SUM)
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div id="dashboard">
+  <div class="header">
+    <div class="header-left">
+      <div class="logo-dot">LK</div>
+      <div>
+        <h1>Ticket Pendency Dashboard</h1>
+        <p id="fileNameLabel">New Ticket Pendency · Creation Date View · Live Data</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="badge-live">LIVE</div>
+      <div class="date-badge" id="snapDate">Loading…</div>
+      <button class="new-file-btn" onclick="loadNewFile()">📂 Load New File</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- KPI Row -->
+    <div class="kpi-row">
+      <div class="kpi orange" style="position:relative;">
+        <div class="kpi-label">Total Tickets</div>
+        <div class="kpi-value" id="kTotal">—</div>
+        <div class="kpi-sub">All statuses · All regions</div>
+        <button class="kpi-dl-btn" onclick="downloadCSV('all')" title="Download all tickets CSV">⬇ CSV</button>
+      </div>
+      <div class="kpi red" style="position:relative;">
+        <div class="kpi-label">2+ High Ageing</div>
+        <div class="kpi-value" id="kHighAge">—</div>
+        <div class="kpi-sub" id="kHighAgePct"></div>
+        <button class="kpi-dl-btn" style="color:#ef4444;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1);" onclick="downloadCSV('high_age')" title="Download 2+ High Ageing tickets CSV">⬇ CSV</button>
+      </div>
+      <div class="kpi blue" style="position:relative;">
+        <div class="kpi-label">Re-Open</div>
+        <div class="kpi-value" id="kReopen">—</div>
+        <div class="kpi-sub" id="kReopenPct"></div>
+        <button class="kpi-dl-btn" style="color:#3b82f6;border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.1);" onclick="downloadCSV('reopen')" title="Download Re-Open tickets CSV">⬇ CSV</button>
+      </div>
+      <div class="kpi green">
+        <div class="kpi-label">Awaiting Assignment</div>
+        <div class="kpi-value" id="kAwaiting">—</div>
+        <div class="kpi-sub" id="kAwaitingPct"></div>
+      </div>
+    </div>
+
+    <!-- SLA KPI row -->
+    <div class="section-header" style="margin-bottom:12px;">
+      <h2>SLA Bifurcation Summary</h2>
+      <div class="pill">0–2 Days · 3–5 Days · 6+ Days</div>
+      <div class="divider"></div>
+    </div>
+    <div class="sla-row" id="slaKpiRow"></div>
+
+    <!-- Ageing Wise Pendency by Work Queue -->
+    <div class="section-header" style="margin-bottom:12px;">
+      <h2>Ageing Wise Pendency by Work Queue</h2>
+      <div class="pill" id="ageingPendPill">Day-wise · All queues · Descending</div>
+      <div class="divider"></div>
+    </div>
+    <div class="card" style="margin-bottom:24px;padding:16px 18px;">
+      <div class="card-title">
+        <span style="background:var(--accent)"></span>
+        Work Queue Pendency — Day-by-Day Ageing (Sorted by Total ↓)
+      </div>
+      <div class="age-filter-bar">
+        <span class="age-filter-label">Show from Day:</span>
+        <div class="age-filter-btns">
+          <button class="age-filter-btn active" data-min="0" onclick="applyAgeFilter(this)">All</button>
+          <button class="age-filter-btn" data-min="3" onclick="applyAgeFilter(this)">2+</button>
+          <button class="age-filter-btn" data-min="4" onclick="applyAgeFilter(this)">3+</button>
+          <button class="age-filter-btn" data-min="6" onclick="applyAgeFilter(this)">5+</button>
+          <button class="age-filter-btn" data-min="9" onclick="applyAgeFilter(this)">8+</button>
+        </div>
+        <span class="age-filter-info" id="ageFilterInfo">Showing all days</span>
+        <button class="dl-btn" id="ageDownloadBtn"
+          style="margin-left:8px;color:var(--accent);border:1px solid rgba(249,115,22,.4);background:rgba(249,115,22,.1);padding:5px 13px;"
+          onclick="downloadAgeingCSV(0)">⬇ Download CSV</button>
+      </div>
+      <div class="age-pend-wrap">
+        <table class="age-pend-table" id="agePendTable">
+          <thead id="agePendHead"></thead>
+          <tbody id="agePendBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('overview',this)">Overview</button>
+      <button class="tab" onclick="switchTab('ageing',this)">L3 View</button>
+      <button class="tab tab-sla" onclick="switchTab('sla',this)">📊 SLA Bifurcation</button>
+      <button class="tab tab-reopen" onclick="switchTab('reopen',this)">🔄 Reopen</button>
+      <button class="tab tab-action" onclick="switchTab('actionable',this)">⚡ Actionable Items</button>
+    </div>
+
+    <!-- OVERVIEW page -->
+    <div class="page active" id="page-overview">
+      <div class="section-header"><h2>Pendency by Status</h2><div class="divider"></div></div>
+      <div class="grid-2-1" style="margin-bottom:20px;">
+        <div class="card"><div class="card-title"><span style="background:var(--accent)"></span>Status Distribution</div><div class="chart-wrap" style="height:260px"><canvas id="statusChart"></canvas></div></div>
+        <div class="card"><div class="card-title"><span style="background:var(--accent2)"></span>Status Breakdown</div><div id="statusBars"></div></div>
+      </div>
+      <div class="section-header"><h2>Pendency Reasons · L2 Level</h2><div class="divider"></div></div>
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="card"><div class="card-title"><span style="background:var(--accent3)"></span>Top L1 Categories</div><div class="chart-wrap" style="height:280px"><canvas id="l1Chart"></canvas></div></div>
+        <div class="card"><div class="card-title"><span style="background:var(--accent4)"></span>Top L2 Pendency Reasons</div><div class="chart-wrap" style="height:280px"><canvas id="l2Chart"></canvas></div></div>
+      </div>
+      <div class="section-header"><h2>Geography &amp; Ageing Overview</h2><div class="divider"></div></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-title"><span style="background:var(--accent)"></span>Tickets by Country</div><div class="chart-wrap" style="height:220px"><canvas id="countryChart"></canvas></div></div>
+        <div class="card"><div class="card-title"><span style="background:var(--warn)"></span>Ageing Distribution</div><div class="chart-wrap" style="height:220px"><canvas id="ageOverviewChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- AGEING page -->
+    <div class="page" id="page-ageing">
+      <div class="section-header"><h2>Ageing Analysis</h2><div class="divider"></div></div>
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="card"><div class="card-title"><span style="background:var(--warn)"></span>Age Bucket Volume</div><div class="chart-wrap" style="height:280px"><canvas id="ageBucketChart"></canvas></div></div>
+        <div class="card"><div class="card-title"><span style="background:var(--accent4)"></span>Age Bucket % Share</div><div class="chart-wrap" style="height:280px"><canvas id="agePieChart"></canvas></div></div>
+      </div>
+      <div class="section-header"><h2>L3 vs Ageing Heatmap</h2><div class="pill" id="heatNPill"></div><div class="divider"></div></div>
+      <div class="card">
+        <div class="card-title"><span style="background:var(--accent)"></span>Ageing by L3 — Intensity Heat Map</div>
+        <div class="heatmap-wrap"><table class="heatmap" id="heatmapTable"></table></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,.9)"></div>0-1 Days</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(59,130,246,.9)"></div>2-3 Days</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(234,179,8,.9)"></div>4-7 Days</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,.9)"></div>8-15 Days</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,.9)"></div>16-30 Days</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(127,29,29,.9)"></div>30+ Days</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLA TAB -->
+    <div class="page" id="page-sla">
+      <div class="sla-tab-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">📊</span>
+          <div>
+            <div style="font-size:16px;font-weight:700;">SLA Bifurcation Summary</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Queue-wise pendency in descending order across all SLA buckets</div>
+          </div>
+        </div>
+        <div class="sla-sub-tabs">
+          <button class="sla-sub-tab active" onclick="switchSlaView('overall',this)">📋 Overall</button>
+          <button class="sla-sub-tab" onclick="switchSlaView('within_sla',this)" style="--stc:#22c55e;">✅ Within SLA <span class="sla-sub-count" id="sst-within_sla">—</span></button>
+          <button class="sla-sub-tab" onclick="switchSlaView('sla_breach',this)" style="--stc:#eab308;">⚠️ SLA Breach <span class="sla-sub-count" id="sst-sla_breach">—</span></button>
+          <button class="sla-sub-tab" onclick="switchSlaView('sla_breach2',this)" style="--stc:#ef4444;">🔴 SLA Breach 2 <span class="sla-sub-count" id="sst-sla_breach2">—</span></button>
+        </div>
+      </div>
+      <div class="sla-view active" id="slaview-overall">
+        <div class="sla-view-kpi" style="border-color:var(--accent)55;background:rgba(249,115,22,.06);">
+          <div style="font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.8px;">📋 Overall Pendency</div>
+          <div style="font-size:28px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent);margin:4px 0;" id="slaov-overall-count">—</div>
+          <div style="font-size:11px;color:var(--muted);">All tickets · All age buckets · Queue sorted ↓</div>
+        </div>
+        <div class="grid-sla-view">
+          <div class="card"><div class="card-title"><span style="background:var(--accent)"></span>Queue-wise Volume · Descending</div><div class="sla-qlist" id="slaQList-overall"></div></div>
+          <div class="card"><div class="card-title"><span style="background:var(--accent2)"></span>Queue Distribution</div><div class="chart-wrap" style="height:380px"><canvas id="slaQChart-overall"></canvas></div></div>
+        </div>
+      </div>
+      <div class="sla-view" id="slaview-within_sla">
+        <div class="sla-view-kpi" style="border-color:#22c55e55;background:rgba(34,197,94,.06);">
+          <div style="font-size:11px;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">✅ Within SLA · 0–2 Days</div>
+          <div style="font-size:28px;font-weight:700;font-family:'DM Mono',monospace;color:#22c55e;margin:4px 0;" id="slaov-within_sla-count">—</div>
+          <div style="font-size:11px;color:var(--muted);" id="slaov-within_sla-pct">Queue sorted ↓</div>
+        </div>
+        <div class="grid-sla-view">
+          <div class="card" style="border-top:2px solid #22c55e;"><div class="card-title"><span style="background:#22c55e"></span>Queue-wise Volume</div><div class="sla-qlist" id="slaQList-within_sla"></div></div>
+          <div class="card" style="border-top:2px solid #22c55e;"><div class="card-title"><span style="background:#22c55e"></span>Queue Distribution</div><div class="chart-wrap" style="height:380px"><canvas id="slaQChart-within_sla"></canvas></div></div>
+        </div>
+      </div>
+      <div class="sla-view" id="slaview-sla_breach">
+        <div class="sla-view-kpi" style="border-color:#eab30855;background:rgba(234,179,8,.06);">
+          <div style="font-size:11px;color:#eab308;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">⚠️ SLA Breach · 3–5 Days</div>
+          <div style="font-size:28px;font-weight:700;font-family:'DM Mono',monospace;color:#eab308;margin:4px 0;" id="slaov-sla_breach-count">—</div>
+          <div style="font-size:11px;color:var(--muted);" id="slaov-sla_breach-pct">Queue sorted ↓</div>
+        </div>
+        <div class="grid-sla-view">
+          <div class="card" style="border-top:2px solid #eab308;"><div class="card-title"><span style="background:#eab308"></span>Queue-wise Volume</div><div class="sla-qlist" id="slaQList-sla_breach"></div></div>
+          <div class="card" style="border-top:2px solid #eab308;"><div class="card-title"><span style="background:#eab308"></span>Queue Distribution</div><div class="chart-wrap" style="height:380px"><canvas id="slaQChart-sla_breach"></canvas></div></div>
+        </div>
+      </div>
+      <div class="sla-view" id="slaview-sla_breach2">
+        <div class="sla-view-kpi" style="border-color:#ef444455;background:rgba(239,68,68,.06);">
+          <div style="font-size:11px;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">🔴 SLA Breach 2 · Red Alert · 6+ Days</div>
+          <div style="font-size:28px;font-weight:700;font-family:'DM Mono',monospace;color:#ef4444;margin:4px 0;" id="slaov-sla_breach2-count">—</div>
+          <div style="font-size:11px;color:var(--muted);" id="slaov-sla_breach2-pct">Queue sorted ↓</div>
+        </div>
+        <div class="grid-sla-view">
+          <div class="card" style="border-top:2px solid #ef4444;"><div class="card-title"><span style="background:#ef4444"></span>Queue-wise Volume</div><div class="sla-qlist" id="slaQList-sla_breach2"></div></div>
+          <div class="card" style="border-top:2px solid #ef4444;"><div class="card-title"><span style="background:#ef4444"></span>Queue Distribution</div><div class="chart-wrap" style="height:380px"><canvas id="slaQChart-sla_breach2"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REOPEN TAB -->
+    <div class="page" id="page-reopen">
+      <div class="reopen-kpi-banner">
+        <div style="font-size:32px;">🔄</div>
+        <div>
+          <div class="reopen-kpi-label">Total Reopen Tickets</div>
+          <div class="reopen-kpi-value" id="reopen-total-count">—</div>
+          <div class="reopen-kpi-sub" id="reopen-total-pct">% of all tickets · Backend Reopened OR Status = Re-Open</div>
+        </div>
+        <div style="margin-left:auto;">
+          <button class="dl-btn" onclick="downloadCSV('reopen')"
+            style="color:#3b82f6;border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.1);font-size:12px;padding:7px 16px;">
+            ⬇ Download Reopen CSV
+          </button>
+        </div>
+      </div>
+      <div class="reopen-grid">
+        <div class="card" style="border-top:2px solid #3b82f6;"><div class="card-title"><span style="background:#3b82f6"></span>Work Queue Wise Reopen Count · Descending ↓</div><div class="reopen-list" id="reopenQueueList"></div></div>
+        <div class="card" style="border-top:2px solid #60a5fa;"><div class="card-title"><span style="background:#60a5fa"></span>L3 Wise Reopen Count · Descending ↓</div><div class="reopen-list" id="reopenL3List"></div></div>
+      </div>
+      <div class="reopen-grid" style="margin-top:16px;">
+        <div class="card"><div class="card-title"><span style="background:#3b82f6"></span>Work Queue Distribution</div><div class="chart-wrap" style="height:360px"><canvas id="reopenQueueChart"></canvas></div></div>
+        <div class="card"><div class="card-title"><span style="background:#60a5fa"></span>L3 Distribution (Top 10)</div><div class="chart-wrap" style="height:360px"><canvas id="reopenL3Chart"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- ACTIONABLE ITEMS TAB -->
+    <div class="page" id="page-actionable">
+      <div class="action-summary-row" id="actionSummaryRow"></div>
+      <div class="action-toolbar">
+        <span class="action-filter-label">Priority:</span>
+        <div class="action-filter-btns">
+          <button class="af-btn active" data-p="ALL" onclick="filterActions('ALL',this)">All</button>
+          <button class="af-btn" data-p="CRITICAL" onclick="filterActions('CRITICAL',this)">🚨 Critical</button>
+          <button class="af-btn" data-p="HIGH" onclick="filterActions('HIGH',this)">⚠️ High</button>
+          <button class="af-btn" data-p="MEDIUM" onclick="filterActions('MEDIUM',this)">📋 Medium</button>
+          <button class="af-btn" data-p="LOW" onclick="filterActions('LOW',this)">✅ Low</button>
+        </div>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span id="actionCountLabel" style="font-size:11px;color:var(--muted);"></span>
+          <button class="dl-btn" onclick="downloadCSV('actionable')"
+            style="color:var(--accent3);border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.1);padding:6px 14px;">
+            ⬇ Download All CSV
+          </button>
+          <button class="dl-btn" id="actionDlFilterBtn" onclick="downloadCSV('actionable_filtered')"
+            style="color:#a855f7;border:1px solid rgba(168,85,247,.4);background:rgba(168,85,247,.1);padding:6px 14px;">
+            ⬇ Download Filtered
+          </button>
+        </span>
+      </div>
+      <div id="actionItemsList"></div>
+    </div>
+  </div><!-- /main -->
+</div><!-- /dashboard -->
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const AGE_ORDER = ["0-1 Days","2-3 Days","4-7 Days","8-15 Days","16-30 Days","30+ Days"];
+const PENDING_STATUSES = ["Awaiting Assignment","Assigned","Follow Up","New",
+  "In Progress","Awaiting Response","Re-Open","Escalated"];
+const SLA_BREACHES = [
+  {key:"within_sla",  label:"Within SLA",  min:0, max:2,    color:"#22c55e", range_label:"0–2 Days"},
+  {key:"sla_breach",  label:"SLA Breach",  min:3, max:5,    color:"#eab308", range_label:"3–5 Days"},
+  {key:"sla_breach2", label:"SLA Breach 2",min:6, max:null, color:"#ef4444", range_label:"6+ Days"},
+];
+const PALETTE = ['#f97316','#3b82f6','#22c55e','#a855f7','#ef4444','#eab308',
+                 '#14b8a6','#ec4899','#6366f1','#06b6d4','#84cc16','#f59e0b'];
+const AGE_COLORS = ['#22c55e','#3b82f6','#eab308','#f97316','#ef4444','#7f1d1d'];
+const AGE_SEG_KEYS = ["0-1 Days","2-3 Days","4-7 Days","8-15 Days","16-30 Days","30+ Days"];
+const AGE_SEG_COLS = ['#22c55e','#3b82f6','#eab308','#f97316','#ef4444','#7f1d1d'];
+
+const NOTE_PATTERNS = [
+  [/\bwaiting\b|\bawaiting\b|\bpending response\b/i,         "Awaiting customer/team response"],
+  [/\bescalat/i,                                              "Escalation in progress"],
+  [/\bblocked\b|\bstuck\b|\bon hold\b/i,                     "Blocked – needs unblocking"],
+  [/\bunassign|\bnot assigned\b|\bno owner\b/i,               "Needs assignment"],
+  [/\berror\b|\bbug\b|\bfailed\b|\bfailure\b/i,              "Technical error/bug reported"],
+  [/\bno update\b|\bno response\b|\bno reply\b/i,            "No update received"],
+  [/\bcustomer follow\b|\bfollow.?up\b/i,                    "Customer follow-up required"],
+  [/\breopen\b|\bre.open\b/i,                                 "Re-opened – root cause review"],
+  [/\bdocument\b|\bdocs?\b|\bproof\b|\bkyc\b/i,              "Document/KYC submission pending"],
+  [/\bpayment\b|\brefund\b|\btransaction\b/i,                "Payment/refund action needed"],
+  [/\bmanual\b|\bmanually\b/i,                               "Manual processing required"],
+  [/\bapproval\b|\bapprove\b|\bauthori/i,                    "Approval pending"],
+];
+
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='#252a3a';
+Chart.defaults.font.family="'Sora',sans-serif";
+Chart.defaults.font.size=11;
+Chart.register(ChartDataLabels);
+Chart.defaults.plugins.datalabels = {display:false};
+
+const charts = {};
+let _globalDF = [];
+let _globalD  = null;
+let _actionItems = [];
+let _activeFilter = 'ALL';
+let _ageMinDay = 0;
+
+// ─── UTILS ────────────────────────────────────────────────────────────────
+function fmt(n){return Number(n||0).toLocaleString();}
+function sortDesc(obj){return Object.fromEntries(Object.entries(obj).sort((a,b)=>b[1]-a[1]));}
+
+// ─── FILE UPLOAD LOGIC ────────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const procMsg   = document.getElementById('processingMsg');
+const errMsg    = document.getElementById('errorMsg');
+
+dropZone.addEventListener('dragover', e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault();dropZone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener('change',e=>{
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+function loadNewFile(){
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('uploadScreen').style.display='flex';
+  fileInput.value='';
+  errMsg.style.display='none';
+  procMsg.style.display='none';
+}
+
+function handleFile(file){
+  errMsg.style.display='none';
+  procMsg.style.display='block';
+  procMsg.textContent='⏳ Reading file…';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      procMsg.textContent='⏳ Parsing Excel…';
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const targetKeywords=["ticketpendencycaseraw-creation","ticket pendency case raw"];
+      let sheetName=wb.SheetNames.find(s=>targetKeywords.some(k=>s.toLowerCase().includes(k)));
+      if(!sheetName) sheetName=wb.SheetNames[0];
+      procMsg.textContent=`⏳ Loading sheet: ${sheetName}…`;
+      const ws=wb.Sheets[sheetName];
+      const raw=XLSX.utils.sheet_to_json(ws,{raw:false,defval:''});
+
+      // Detect header row (find row containing "Case Creation Time")
+      // xlsx sheet_to_json uses first row as header; handle offset if needed
+      // Try reading raw rows to find header
+      const rawArr=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+      let headerRow=0;
+      for(let i=0;i<Math.min(6,rawArr.length);i++){
+        if(rawArr[i].some(v=>String(v).trim()==='Case Creation Time')){headerRow=i;break;}
+      }
+      // Re-read with correct header
+      const data=XLSX.utils.sheet_to_json(ws,{header:rawArr[headerRow].map(v=>String(v).trim()),range:headerRow+1,defval:''});
+
+      procMsg.textContent='⏳ Processing data…';
+      setTimeout(()=>{
+        try{
+          const df=processData(data);
+          _globalDF=df;
+          _globalD=buildDataBlob(df);
+          document.getElementById('fileNameLabel').textContent=`${file.name} · Creation Date View`;
+          document.getElementById('uploadScreen').style.display='none';
+          document.getElementById('dashboard').style.display='block';
+          procMsg.style.display='none';
+          renderAll(_globalD);
+        }catch(ex){showError(ex);}
+      },50);
+    }catch(ex){showError(ex);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showError(ex){
+  procMsg.style.display='none';
+  errMsg.style.display='block';
+  errMsg.textContent='❌ Error: '+ex.message+'\n\nMake sure your file has the expected columns (Case Creation Time, Status (Case), LK-Country (Case), Mapping_L1/L2/L3, etc.)';
+  console.error(ex);
+}
+
+// ─── DATA PROCESSING ────────────────────────────────────────────────────────
+const COL_MAP = {
+  "Case Creation Time":        "created_at",
+  "Case Number":               "case_number",
+  "Status (Case)":             "status",
+  "LK-Country (Case)":        "country",
+  "Mapping_L1 (Case)":        "l1",
+  "Mapping_L2 (Case)":        "l2",
+  "Mapping_L3 (Case)":        "l3",
+  "Current Work Queue (Case)":"queue_current",
+  "Last Work Queue (Case)":   "queue_last",
+  "Ticket Notes (Case)":      "notes",
+  "Backend Reopened Ticket (Case)":"backend_reopened",
+  "Count (SUM)":              "count_sum",
+  "Case Count (SUM)":         "count_sum",
+};
+
+function resolveQueue(row){
+  const country=(row.country||'').trim().toLowerCase();
+  const current=(row.queue_current||'').trim();
+  const last=(row.queue_last||'').trim();
+  const blank=v=>!v||v.toLowerCase()==='nan';
+  if(country!=='india') return 'International';
+  if(!blank(current)) return current;
+  if(!blank(last)) return last;
+  return 'New';
+}
+
+function parseDate(v){
+  if(!v) return null;
+  if(v instanceof Date) return v;
+  const d=new Date(v);
+  return isNaN(d)?null:d;
+}
+
+function ageBucket(d){
+  if(d===null||d===undefined||isNaN(d)) return 'Unknown';
+  d=Math.round(d);
+  if(d<=1)  return '0-1 Days';
+  if(d<=3)  return '2-3 Days';
+  if(d<=7)  return '4-7 Days';
+  if(d<=15) return '8-15 Days';
+  if(d<=30) return '16-30 Days';
+  return '30+ Days';
+}
+
+function processData(raw){
+  const now=new Date();
+  // rename columns
+  const df=raw.map(r=>{
+    const row={};
+    for(const [orig,mapped] of Object.entries(COL_MAP)){
+      if(r[orig]!==undefined) row[mapped]=r[orig];
+    }
+    // copy rest
+    for(const k of Object.keys(r)){
+      if(!COL_MAP[k]) row[k]=r[k];
+    }
+    return row;
+  });
+
+  // Filter: keep count_sum == 1
+  let filtered=df;
+  if(df.length && df[0].count_sum!==undefined){
+    filtered=df.filter(r=>String(r.count_sum||'').trim()==='1'||Number(r.count_sum)===1);
+  }
+
+  // Check essential cols
+  const sample=filtered[0]||{};
+  const missing=['created_at','status','country','l1','l2','l3'].filter(c=>!(c in sample));
+  if(missing.length&&filtered.length){
+    // Try to be lenient – just warn
+    console.warn('Missing cols:',missing);
+  }
+
+  // Add computed fields
+  return filtered.map(r=>{
+    const dt=parseDate(r.created_at);
+    const ageDays=dt?Math.round((now-dt)/(1000*86400)*10)/10:null;
+    const bucket=ageBucket(ageDays);
+    const queue=resolveQueue(r);
+    const backendReopen=String(r.backend_reopened||'').trim().toLowerCase()==='yes';
+    const statusReopen=String(r.status||'').trim().toLowerCase()==='re-open';
+    const isReopen=backendReopen||statusReopen;
+    const ageDaysRounded=ageDays!==null?Math.round(ageDays):null;
+    return {
+      ...r,
+      created_at_parsed:dt,
+      age_days:ageDays,
+      age_days_int:ageDaysRounded,
+      age_bucket:bucket,
+      queue,
+      is_reopen:isReopen,
+      country:String(r.country||'Unknown').trim()||'Unknown',
+      l1:String(r.l1||'Unknown').trim()||'Unknown',
+      l2:String(r.l2||'Unknown').trim()||'Unknown',
+      l3:String(r.l3||'Unknown').trim()||'Unknown',
+      status:String(r.status||'Unknown').trim()||'Unknown',
+    };
+  });
+}
+
+function vc(df,col){
+  const m={};
+  df.forEach(r=>{const v=r[col]||'Unknown';m[v]=(m[v]||0)+1;});
+  return Object.fromEntries(Object.entries(m).sort((a,b)=>b[1]-a[1]));
+}
+
+function buildDataBlob(df){
+  const now=new Date();
+  const total=df.length;
+  const snapDate=now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Age counts
+  const age_counts={};
+  AGE_ORDER.forEach(k=>age_counts[k]=0);
+  df.forEach(r=>{if(age_counts[r.age_bucket]!==undefined) age_counts[r.age_bucket]++;});
+
+  // L3 age matrix
+  const l3_age={};
+  df.forEach(r=>{
+    if(!l3_age[r.l3]) l3_age[r.l3]={};
+    l3_age[r.l3][r.age_bucket]=(l3_age[r.l3][r.age_bucket]||0)+1;
+  });
+
+  // L3 full table
+  const l3Map={};
+  df.forEach(r=>{
+    if(!l3Map[r.l3]) l3Map[r.l3]={l1:r.l1,l2:r.l2,count:0,ages:{}};
+    l3Map[r.l3].count++;
+    l3Map[r.l3].ages[r.age_bucket]=(l3Map[r.l3].ages[r.age_bucket]||0)+1;
+  });
+  const l3_full=Object.entries(l3Map)
+    .sort((a,b)=>b[1].count-a[1].count)
+    .map(([name,d])=>({name,...d}));
+
+  // SLA data
+  const sla_data={};
+  SLA_BREACHES.forEach(b=>{
+    const sub=df.filter(r=>{
+      const d=r.age_days;
+      if(d===null) return false;
+      return d>=b.min&&(b.max===null||d<=b.max);
+    });
+    const by_queue=vc(sub,'queue');
+    sla_data[b.key]={
+      count:sub.length,
+      pct:total?((sub.length/total)*100).toFixed(1):'0.0',
+      by_queue,
+      color:b.color,
+      label:b.label,
+      range_label:b.range_label,
+    };
+  });
+
+  // Queue daily age pivot
+  const validAge=df.filter(r=>r.age_days_int!==null);
+  const maxDay=Math.min(9,validAge.reduce((m,r)=>Math.max(m,r.age_days_int||0),0));
+  const dayCols=[];
+  for(let i=0;i<=maxDay;i++) dayCols.push(String(i));
+  const has10plus=validAge.some(r=>r.age_days_int>=10);
+  if(has10plus) dayCols.push('10+');
+
+  const queueDayPivot={};
+  const queues=[...new Set(validAge.map(r=>r.queue))];
+  queues.forEach(q=>{
+    const grp=validAge.filter(r=>r.queue===q);
+    const days={};
+    dayCols.filter(d=>d!=='10+').forEach(d=>{days[d]=0;});
+    if(has10plus) days['10+']=0;
+    grp.forEach(r=>{
+      const d=r.age_days_int;
+      if(d>=10&&has10plus) days['10+']=(days['10+']||0)+1;
+      else if(d<=9) days[String(d)]=(days[String(d)]||0)+1;
+    });
+    const rowTotal=Object.values(days).reduce((s,v)=>s+v,0);
+    queueDayPivot[q]={days,total:rowTotal};
+  });
+  const queueDayPivotSorted=Object.fromEntries(
+    Object.entries(queueDayPivot).sort((a,b)=>b[1].total-a[1].total)
+  );
+
+  // Reopen
+  const reopenDF=df.filter(r=>r.is_reopen);
+  const reopen_by_queue=vc(reopenDF,'queue');
+  const reopen_by_l3=vc(reopenDF,'l3');
+
+  // Filter counts
+  const filter_counts={
+    '0':df.filter(r=>r.age_days!==null).length,
+    '3':df.filter(r=>r.age_days!==null&&r.age_days>=3).length,
+    '4':df.filter(r=>r.age_days!==null&&r.age_days>=4).length,
+    '6':df.filter(r=>r.age_days!==null&&r.age_days>=6).length,
+    '9':df.filter(r=>r.age_days!==null&&r.age_days>=9).length,
+  };
+
+  return {
+    total,
+    snapshot_date:snapDate,
+    status_counts:vc(df,'status'),
+    l1_counts:vc(df,'l1'),
+    l2_counts:vc(df,'l2'),
+    l3_counts:vc(df,'l3'),
+    queue_counts:vc(df,'queue'),
+    age_counts,
+    age_order:AGE_ORDER,
+    country_counts:vc(df,'country'),
+    l3_age,
+    l3_full,
+    sla_data,
+    sla_order:SLA_BREACHES.map(b=>b.key),
+    queue_age_daily:queueDayPivotSorted,
+    day_cols:dayCols,
+    reopen_count:reopenDF.length,
+    high_age_count:df.filter(r=>r.age_days!==null&&r.age_days>=3).length,
+    reopen_by_queue,
+    reopen_by_l3,
+    actionable_items:buildActionableItems(df),
+    filter_counts,
+  };
+}
+
+// ─── ACTIONABLE ITEMS ──────────────────────────────────────────────────────
+function extractNoteThemes(notesArr){
+  const combined=notesArr.map(n=>String(n||'')).join(' ');
+  const found=[];
+  for(const [pat,label] of NOTE_PATTERNS){
+    if(pat.test(combined)) found.push(label);
+  }
+  return found.slice(0,3);
+}
+
+function buildActionableItems(df){
+  const groups={};
+  df.forEach(r=>{
+    if(!groups[r.l3]) groups[r.l3]=[];
+    groups[r.l3].push(r);
+  });
+  const items=[];
+  for(const [l3name,grp] of Object.entries(groups)){
+    const ages=grp.map(r=>r.age_days).filter(d=>d!==null);
+    const maxAge=ages.length?Math.max(...ages):0;
+    const avgAge=ages.length?Math.round(ages.reduce((s,v)=>s+v,0)/ages.length*10)/10:0;
+    const critCt=ages.filter(d=>d>=6).length;
+    const breachCt=ages.filter(d=>d>=3).length;
+    const withinCt=grp.length-breachCt;
+    let priority,priorityOrder;
+    if(critCt>0){priority='CRITICAL';priorityOrder=0;}
+    else if(breachCt>0){priority='HIGH';priorityOrder=1;}
+    else if(grp.length>=5){priority='MEDIUM';priorityOrder=2;}
+    else{priority='LOW';priorityOrder=3;}
+
+    const l1s=grp.map(r=>r.l1);
+    const l1=mode(l1s)||'N/A';
+    const l2s=grp.map(r=>r.l2);
+    const l2=mode(l2s)||'N/A';
+    const notesArr=grp.map(r=>r.notes||'');
+    const themes=extractNoteThemes(notesArr);
+    const total=grp.length;
+    const pct=total?Math.round(breachCt/total*100):0;
+    const ageStr=maxAge?Math.round(maxAge)+'d':'?d';
+    let action;
+    if(priority==='CRITICAL') action=`🚨 IMMEDIATE ACTION: ${breachCt}/${total} tickets (${pct}%) are SLA-breached — oldest is ${ageStr}.`;
+    else if(priority==='HIGH') action=`⚠️ HIGH PRIORITY: ${breachCt}/${total} tickets (${pct}%) exceed SLA — review & close today.`;
+    else if(priority==='MEDIUM') action=`📋 MEDIUM: ${total} open tickets — proactive follow-up recommended before breach.`;
+    else action=`✅ LOW: ${total} ticket(s) within SLA — routine monitoring.`;
+    if(themes.length) action+=' Key signals: '+themes.join('; ')+'.';
+
+    const caseIds=grp.sort((a,b)=>(b.age_days||0)-(a.age_days||0)).map(r=>String(r.case_number||'')).filter(Boolean);
+    const age_buckets={};
+    AGE_SEG_KEYS.forEach(k=>age_buckets[k]=0);
+    grp.forEach(r=>{if(age_buckets[r.age_bucket]!==undefined) age_buckets[r.age_bucket]++;});
+    items.push({l3:l3name,l1,l2,total,critical_count:critCt,breach_count:breachCt,within_count:withinCt,
+      max_age:maxAge,avg_age:avgAge,priority,priority_order:priorityOrder,action,note_themes:themes,
+      case_ids:caseIds,age_buckets});
+  }
+  return items.sort((a,b)=>a.priority_order-b.priority_order||-a.breach_count+b.breach_count||-a.total+b.total);
+}
+function mode(arr){const m={};arr.forEach(v=>{m[v]=(m[v]||0)+1;});return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0];}
+
+// ─── CHART HELPERS ─────────────────────────────────────────────────────────
+function mkChart(id,type,labels,datasets,opts={}){
+  if(charts[id]) charts[id].destroy();
+  const ctx=document.getElementById(id);
+  if(!ctx) return;
+  charts[id]=new Chart(ctx.getContext('2d'),{type,data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:opts.legend??false,labels:{color:'#94a3b8',boxWidth:10,font:{size:10}}},
+        tooltip:{backgroundColor:'#1c2030',borderColor:'#252a3a',borderWidth:1,
+          titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:6},
+        ...((opts.plugins)||{})
+      },...opts}});
+}
+
+// ─── RENDER ALL ─────────────────────────────────────────────────────────────
+function renderAll(D){
+  const statusSorted=sortDesc(D.status_counts);
+  const l1Sorted=sortDesc(D.l1_counts);
+  const l2Sorted=sortDesc(D.l2_counts);
+  const countrySorted=sortDesc(D.country_counts);
+
+  document.getElementById('snapDate').textContent='As of '+D.snapshot_date;
+  document.getElementById('kTotal').textContent=fmt(D.total);
+  const highAge=D.high_age_count||0;
+  document.getElementById('kHighAge').textContent=fmt(highAge);
+  document.getElementById('kHighAgePct').textContent=(D.total?(highAge/D.total*100).toFixed(1):0)+'% of all tickets';
+  const reopen=D.reopen_count||0;
+  document.getElementById('kReopen').textContent=fmt(reopen);
+  document.getElementById('kReopenPct').textContent=(D.total?(reopen/D.total*100).toFixed(1):0)+'% of all tickets';
+  const awaiting=D.status_counts['Awaiting Assignment']||0;
+  document.getElementById('kAwaiting').textContent=fmt(awaiting);
+  document.getElementById('kAwaitingPct').textContent=(D.total?(awaiting/D.total*100).toFixed(1):0)+'% of all tickets';
+
+  // SLA KPI cards
+  const slaKpiRow=document.getElementById('slaKpiRow');
+  slaKpiRow.innerHTML=D.sla_order.map(key=>{
+    const s=D.sla_data[key];
+    const icon=key==='within_sla'?'✅':key==='sla_breach'?'⚠️':'🔴';
+    return `<div class="sla-kpi" style="background:${s.color}18;border-color:${s.color}55;">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${s.color};border-radius:12px 12px 0 0;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div class="sla-label" style="color:${s.color};">${icon} ${s.label}
+          <span class="sla-badge" style="background:${s.color}22;color:${s.color};border:1px solid ${s.color}44;">${s.range_label}</span>
+        </div>
+        <button class="dl-btn" onclick="downloadSLABucketCSV('${key}')"
+          style="color:${s.color};border-color:${s.color}55;background:${s.color}18;">⬇ CSV</button>
+      </div>
+      <div class="sla-value" style="color:${s.color};">${fmt(s.count)}</div>
+      <div class="sla-sub" style="color:${s.color};">${s.pct}% of total tickets</div>
+    </div>`;
+  }).join('');
+
+  // Age filter table
+  _ageMinDay=0;
+  renderAgeTable(D,0);
+
+  // Status doughnut
+  const statusKeys=Object.keys(statusSorted),statusVals=Object.values(statusSorted);
+  const statusTotal=statusVals.reduce((a,b)=>a+b,0);
+  if(charts['statusChart']) charts['statusChart'].destroy();
+  charts['statusChart']=new Chart(document.getElementById('statusChart').getContext('2d'),{
+    type:'doughnut',data:{labels:statusKeys,datasets:[{data:statusVals,
+      backgroundColor:statusKeys.map((_,i)=>PALETTE[i%PALETTE.length]),borderWidth:0,hoverOffset:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{
+      legend:{display:true,position:'right',labels:{color:'#94a3b8',boxWidth:10,padding:8,font:{size:10}}},
+      tooltip:{backgroundColor:'#1c2030',borderColor:'#252a3a',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:6,
+        callbacks:{label:ctx=>' '+ctx.label+': '+fmt(ctx.raw)+' ('+(ctx.raw/statusTotal*100).toFixed(1)+'%)'}},
+      datalabels:{display:false}},cutout:'65%'}});
+
+  // Status bars
+  const sbDiv=document.getElementById('statusBars');
+  const sMax=Math.max(...statusVals,1);
+  sbDiv.innerHTML=Object.entries(statusSorted).map(([k,v],i)=>`
+    <div class="status-row">
+      <div class="status-label">${k}</div>
+      <div class="status-bar-wrap"><div class="status-bar" style="width:${(v/sMax*100).toFixed(1)}%;background:${PALETTE[i%PALETTE.length]}"></div></div>
+      <div class="status-count">${fmt(v)}</div>
+    </div>`).join('');
+
+  // L1 bar
+  const l1k=Object.keys(l1Sorted),l1v=Object.values(l1Sorted);
+  mkChart('l1Chart','bar',l1k,[{data:l1v,backgroundColor:l1k.map((_,i)=>PALETTE[i%PALETTE.length]+'cc'),borderWidth:0,borderRadius:4,borderSkipped:false}],
+    {indexAxis:'y',layout:{padding:{right:48}},plugins:{datalabels:{display:true,color:'#e2e8f0',font:{size:10,family:"'DM Mono',monospace",weight:'500'},formatter:v=>fmt(v),anchor:'end',align:'end',clamp:true}},
+     scales:{x:{grid:{color:'#252a3a'},ticks:{color:'#64748b'}},y:{grid:{display:false},ticks:{color:'#94a3b8'}}}});
+
+  // L2 bar
+  const l2k=Object.keys(l2Sorted),l2v=Object.values(l2Sorted);
+  mkChart('l2Chart','bar',l2k,[{data:l2v,backgroundColor:l2k.map((_,i)=>PALETTE[(i+3)%PALETTE.length]+'cc'),borderWidth:0,borderRadius:4,borderSkipped:false}],
+    {indexAxis:'y',layout:{padding:{right:48}},plugins:{datalabels:{display:true,color:'#e2e8f0',font:{size:10,family:"'DM Mono',monospace",weight:'500'},formatter:v=>fmt(v),anchor:'end',align:'end',clamp:true}},
+     scales:{x:{grid:{color:'#252a3a'},ticks:{color:'#64748b'}},y:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:10}}}}});
+
+  // Country doughnut
+  const ctryK=Object.keys(countrySorted),ctryV=Object.values(countrySorted);
+  const ctryTotal=ctryV.reduce((a,b)=>a+b,0)||1;
+  if(charts['countryChart']) charts['countryChart'].destroy();
+  charts['countryChart']=new Chart(document.getElementById('countryChart').getContext('2d'),{
+    type:'doughnut',data:{labels:ctryK,datasets:[{data:ctryV,backgroundColor:ctryK.map((_,i)=>PALETTE[i%PALETTE.length]),borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{
+      legend:{display:true,position:'right',labels:{color:'#94a3b8',boxWidth:10,padding:6,font:{size:10}}},
+      tooltip:{backgroundColor:'#1c2030',borderColor:'#252a3a',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:6,
+        callbacks:{label:ctx=>' '+ctx.label+': '+fmt(ctx.raw)+' ('+(ctx.raw/ctryTotal*100).toFixed(1)+'%)'}},
+      datalabels:{display:ctx=>(ctx.dataset.data[ctx.dataIndex]/ctryTotal)>0.04,color:'#fff',
+        font:{size:10,family:"'DM Mono',monospace",weight:'600'},formatter:v=>fmt(v)+'\n'+(v/ctryTotal*100).toFixed(1)+'%',textAlign:'center'}},
+      cutout:'60%'}});
+
+  // Age overview bar
+  const ageVals=D.age_order.map(k=>D.age_counts[k]||0);
+  mkChart('ageOverviewChart','bar',D.age_order,[{data:ageVals,backgroundColor:AGE_COLORS.map(c=>c+'cc'),borderWidth:0,borderRadius:5,borderSkipped:false}],
+    {layout:{padding:{top:20}},plugins:{datalabels:{display:true,color:'#e2e8f0',font:{size:10,family:"'DM Mono',monospace",weight:'500'},formatter:v=>v>0?fmt(v):'',anchor:'end',align:'top',clamp:true}},
+     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#252a3a'},ticks:{color:'#64748b'}}}});
+
+  // Ageing page
+  mkChart('ageBucketChart','bar',D.age_order,[{data:D.age_order.map(k=>D.age_counts[k]||0),backgroundColor:AGE_COLORS.map(c=>c+'cc'),borderWidth:0,borderRadius:6,borderSkipped:false}],
+    {layout:{padding:{top:20}},plugins:{datalabels:{display:true,color:'#e2e8f0',font:{size:10,family:"'DM Mono',monospace",weight:'500'},formatter:v=>v>0?fmt(v):'',anchor:'end',align:'top',clamp:true}},
+     scales:{x:{grid:{display:false},ticks:{color:'#94a3b8'}},y:{grid:{color:'#252a3a'},ticks:{color:'#64748b'}}}});
+
+  const ageTotal=D.age_order.reduce((s,k)=>s+(D.age_counts[k]||0),0)||1;
+  if(charts['agePieChart']) charts['agePieChart'].destroy();
+  charts['agePieChart']=new Chart(document.getElementById('agePieChart').getContext('2d'),{
+    type:'doughnut',data:{labels:D.age_order,datasets:[{data:D.age_order.map(k=>D.age_counts[k]||0),backgroundColor:AGE_COLORS.map(c=>c+'dd'),borderWidth:0,hoverOffset:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{
+      legend:{display:true,position:'right',labels:{color:'#94a3b8',boxWidth:10,padding:8,font:{size:11}}},
+      tooltip:{backgroundColor:'#1c2030',borderColor:'#252a3a',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:6,
+        callbacks:{label:ctx=>' '+ctx.label+': '+fmt(ctx.raw)+' ('+(ctx.raw/ageTotal*100).toFixed(1)+'%)'}},
+      datalabels:{display:ctx=>(ctx.dataset.data[ctx.dataIndex]/ageTotal)>0.04,color:'#fff',
+        font:{size:10,family:"'DM Mono',monospace",weight:'600'},formatter:v=>fmt(v)+'\n'+(v/ageTotal*100).toFixed(1)+'%',textAlign:'center'}},
+      cutout:'55%'}});
+
+  // Heatmap
+  const heatNPill=document.getElementById('heatNPill');
+  if(heatNPill) heatNPill.textContent='All '+Object.keys(D.l3_age).length+' L3 Categories';
+  function heatColor(v,mx){
+    if(!v) return 'rgba(37,42,58,.4)';
+    const r=v/mx,a=.2+r*.8;
+    if(r<.15) return `rgba(34,197,94,${a})`;
+    if(r<.35) return `rgba(59,130,246,${a})`;
+    if(r<.55) return `rgba(234,179,8,${a})`;
+    if(r<.75) return `rgba(249,115,22,${a})`;
+    return `rgba(239,68,68,${a})`;
+  }
+  const ht=document.getElementById('heatmapTable');
+  let hH=`<thead><tr><th>L3 Category</th>`;
+  D.age_order.forEach(ag=>hH+=`<th>${ag}</th>`);
+  hH+=`<th>Total</th></tr></thead>`;
+  ht.innerHTML=hH;
+  const allV=[];
+  Object.values(D.l3_age).forEach(r=>D.age_order.forEach(ag=>allV.push(r[ag]||0)));
+  const mx=Math.max(...allV,1);
+  const heatEntries=Object.entries(D.l3_age)
+    .map(([name,ages])=>({name,ages,tot:D.age_order.reduce((s,ag)=>s+(ages[ag]||0),0)}))
+    .sort((a,b)=>b.tot-a.tot);
+  const hb=document.createElement('tbody');
+  heatEntries.forEach(({name,ages,tot})=>{
+    let row=`<tr><td title="${name}">${name.length>25?name.slice(0,24)+'…':name}</td>`;
+    D.age_order.forEach(ag=>{const v=ages[ag]||0;row+=`<td><div class="heat-cell" style="background:${heatColor(v,mx)}">${v||'—'}</div></td>`;});
+    row+=`<td><strong>${tot}</strong></td></tr>`;
+    hb.innerHTML+=row;
+  });
+  ht.appendChild(hb);
+
+  renderSlaTab(D);
+  renderReopenTab(D);
+  renderActionableTab(D);
+}
+
+// ─── AGE TABLE ────────────────────────────────────────────────────────────
+function renderAgeTable(D,minDay){
+  const allCols=D.day_cols;
+  const pivot=D.queue_age_daily;
+  const queues=Object.keys(pivot).sort((a,b)=>pivot[b].total-pivot[a].total);
+  let globalMax=0;
+  queues.forEach(q=>allCols.forEach(d=>{const v=pivot[q].days[d]||0;if(v>globalMax)globalMax=v;}));
+  function heatClass(v){
+    if(!v) return 'age-cell-0';
+    const pct=globalMax>0?v/globalMax:0;
+    if(pct<0.05) return 'age-cell-1';
+    if(pct<0.15) return 'age-cell-2';
+    if(pct<0.30) return 'age-cell-3';
+    if(pct<0.50) return 'age-cell-4';
+    if(pct<0.75) return 'age-cell-5';
+    return 'age-cell-6';
+  }
+  const numericCols=allCols.filter(d=>d!=='10+'&&parseInt(d)>=minDay);
+  const show10plus=allCols.includes('10+')&&minDay<=10;
+  const cols=show10plus?[...numericCols,'10+']:numericCols;
+
+  const thead=document.getElementById('agePendHead');
+  if(thead){
+    const dayH=cols.map(d=>{
+      const is10p=d==='10+';
+      const style=is10p?' style="background:rgba(239,68,68,.18);color:#f87171;border-radius:4px;font-weight:700;padding:4px 8px;"':'';
+      return `<th${style}>${d}</th>`;
+    }).join('');
+    thead.innerHTML=`<tr><th style="text-align:left;min-width:200px;"># Work Queue</th>${dayH}<th class="total-col">Total</th></tr>`;
+  }
+
+  const filteredQueues=queues.map(q=>{
+    const ft=cols.reduce((s,d)=>s+(pivot[q].days[d]||0),0);
+    return {q,filteredTotal:ft};
+  }).sort((a,b)=>b.filteredTotal-a.filteredTotal);
+
+  const grandDayTotals={};
+  cols.forEach(d=>{grandDayTotals[d]=queues.reduce((s,q)=>s+(pivot[q].days[d]||0),0);});
+  const trueTotal=(D.filter_counts&&D.filter_counts[String(minDay)]!=null)?D.filter_counts[String(minDay)]:filteredQueues.reduce((s,r)=>s+r.filteredTotal,0);
+
+  const tbody=document.getElementById('agePendBody');
+  if(!tbody) return;
+  const dataRows=filteredQueues.map(({q,filteredTotal},i)=>{
+    const row=pivot[q];
+    const cells=cols.map(d=>{
+      const v=row.days[d]||0;
+      const is10p=d==='10+';
+      const extra=is10p&&v>0?' style="background:rgba(239,68,68,.1);border-radius:4px;"':'';
+      const display=v>0?`<span class="age-cell-val ${heatClass(v)}"${extra}>${fmt(v)}</span>`:`<span style="color:var(--border);">—</span>`;
+      return `<td>${display}</td>`;
+    }).join('');
+    const rankCls=i<3?'top3':'';
+    return `<tr><td><span class="rank-num ${rankCls}">${i+1}</span>${q}</td>${cells}<td class="total-col">${fmt(filteredTotal)}</td></tr>`;
+  }).join('')||`<tr><td colspan="${cols.length+2}" style="color:var(--muted);text-align:center;padding:24px;">No data for selected filter</td></tr>`;
+
+  const grandCells=cols.map(d=>{const v=grandDayTotals[d]||0;const display=v>0?`<span class="age-cell-val age-grand-val">${fmt(v)}</span>`:`<span style="color:var(--border);">—</span>`;return `<td class="grand-total-cell">${display}</td>`;}).join('');
+  const grandRow=`<tr class="grand-total-row"><td class="grand-total-label">Grand Total</td>${grandCells}<td class="grand-total-cell total-col" style="font-size:13px;">${fmt(trueTotal)}</td></tr>`;
+  tbody.innerHTML=dataRows+grandRow;
+
+  const info=document.getElementById('ageFilterInfo');
+  if(info) info.textContent=minDay===0?`Showing all ${cols.length} cols · ${queues.length} queues`:`Day ${minDay}+ · ${fmt(trueTotal)} tickets`;
+  const pill=document.getElementById('ageingPendPill');
+  if(pill) pill.textContent=minDay===0?`Day-wise (0–9 + 10+) · ${queues.length} queues · Descending`:`${queues.length} queues · Day ${minDay}+ filter`;
+}
+
+window.applyAgeFilter=function(btn){
+  document.querySelectorAll('.age-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const minDay=parseInt(btn.dataset.min);
+  _ageMinDay=minDay;
+  renderAgeTable(_globalD,minDay);
+  const dlBtn=document.getElementById('ageDownloadBtn');
+  if(dlBtn){
+    dlBtn.textContent='⬇ Download '+btn.textContent.trim()+' CSV';
+    dlBtn.onclick=()=>downloadAgeingCSV(minDay);
+  }
+};
+
+// ─── SLA TAB ──────────────────────────────────────────────────────────────
+function renderSlaTab(D){
+  const VIEWS=[
+    {id:'overall',    color:'#f97316', data:sortDesc(D.queue_counts), total:D.total},
+    {id:'within_sla', color:'#22c55e', data:D.sla_data.within_sla.by_queue, total:D.sla_data.within_sla.count, pct:D.sla_data.within_sla.pct},
+    {id:'sla_breach', color:'#eab308', data:D.sla_data.sla_breach.by_queue, total:D.sla_data.sla_breach.count, pct:D.sla_data.sla_breach.pct},
+    {id:'sla_breach2',color:'#ef4444', data:D.sla_data.sla_breach2.by_queue,total:D.sla_data.sla_breach2.count,pct:D.sla_data.sla_breach2.pct},
+  ];
+  VIEWS.forEach(v=>{
+    const sstEl=document.getElementById('sst-'+v.id);
+    if(sstEl) sstEl.textContent=fmt(v.total);
+    const cntEl=document.getElementById('slaov-'+v.id+'-count');
+    if(cntEl) cntEl.textContent=fmt(v.total);
+    const pctEl=document.getElementById('slaov-'+v.id+'-pct');
+    if(pctEl&&v.pct!==undefined) pctEl.textContent=v.pct+'% of all tickets · Queue sorted ↓';
+    const entries=Object.entries(v.data).sort((a,b)=>b[1]-a[1]);
+    const qMax=entries.length?entries[0][1]:1;
+    const totalV=entries.reduce((s,[,n])=>s+n,0)||1;
+    const listEl=document.getElementById('slaQList-'+v.id);
+    if(listEl) listEl.innerHTML=entries.map(([q,n],i)=>`<div class="sla-qrow">
+      <div class="sla-qrank ${i<3?'top3':''}">${i+1}</div>
+      <div class="sla-qname" title="${q}">${q}</div>
+      <div class="sla-qbar-wrap"><div class="sla-qbar" style="width:${(n/qMax*100).toFixed(1)}%;background:${v.color};opacity:.85;"></div></div>
+      <div class="sla-qnum" style="color:${v.color};">${fmt(n)}</div>
+      <div class="sla-qpct">${(n/totalV*100).toFixed(1)}%</div>
+    </div>`).join('')||'<div style="color:var(--muted);font-size:11px;padding:8px 0;">No cases in this bucket</div>';
+    const chartId='slaQChart-'+v.id;
+    if(charts[chartId]) charts[chartId].destroy();
+    const ctx=document.getElementById(chartId);
+    if(ctx&&entries.length){
+      const qL=entries.map(([q])=>q),qV=entries.map(([,n])=>n),qT=qV.reduce((a,b)=>a+b,0)||1;
+      charts[chartId]=new Chart(ctx.getContext('2d'),{type:'doughnut',data:{labels:qL,datasets:[{data:qV,backgroundColor:qL.map((_,i)=>PALETTE[i%PALETTE.length]+'cc'),borderWidth:0,hoverOffset:5}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{
+          legend:{display:true,position:'right',labels:{color:'#94a3b8',boxWidth:9,padding:7,font:{size:10}}},
+          tooltip:{backgroundColor:'#1c2030',borderColor:'#252a3a',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:6,
+            callbacks:{label:ctx2=>' '+ctx2.label+': '+fmt(ctx2.raw)+' ('+(ctx2.raw/qT*100).toFixed(1)+'%)'}},
+          datalabels:{display:ctx2=>(ctx2.dataset.data[ctx2.dataIndex]/qT)>0.05,color:'#fff',font:{size:9,family:"'DM Mono',monospace",weight:'600'},formatter:val=>fmt(val)+'\n'+(val/qT*100).toFixed(1)+'%',textAlign:'center'}},
+          cutout:'52%'}});
+    }
+  });
+}
+
+// ─── REOPEN TAB ──────────────────────────────────────────────────────────
+function renderReopenTab(D){
+  const reopen=D.reopen_count||0;
+  const byQueue=D.reopen_by_queue||{};
+  const byL3=D.reopen_by_l3||{};
+  const cntEl=document.getElementById('reopen-total-count');
+  if(cntEl) cntEl.textContent=fmt(reopen);
+  const pctEl=document.getElementById('reopen-total-pct');
+  if(pctEl) pctEl.textContent=(D.total?(reopen/D.total*100).toFixed(1):'0.0')+'% of all tickets · Backend Reopened OR Status = Re-Open';
+
+  function makeList(containerId,data,totalRef){
+    const el=document.getElementById(containerId);
+    if(!el) return;
+    const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]);
+    const maxV=entries.length?entries[0][1]:1;
+    el.innerHTML=entries.map(([name,n],i)=>`<div class="reopen-row">
+      <div class="reopen-rank ${i<3?'top3':''}">${i+1}</div>
+      <div class="reopen-name" title="${name}">${name}</div>
+      <div class="reopen-bar-wrap"><div class="reopen-bar" style="width:${(n/maxV*100).toFixed(1)}%;"></div></div>
+      <div class="reopen-num">${fmt(n)}</div>
+      <div class="reopen-pct">${totalRef?(n/totalRef*100).toFixed(1):0}%</div>
+    </div>`).join('')||'<div style="color:var(--muted);font-size:11px;padding:8px;">No reopen tickets</div>';
+  }
+  const qTotal=Object.values(byQueue).reduce((s,v)=>s+v,0)||1;
+  const l3Total=Object.values(byL3).reduce((s,v)=>s+v,0)||1;
+  makeList('reopenQueueList',byQueue,qTotal);
+  makeList('reopenL3List',byL3,l3Total);
+
+  // Charts
+  function makeDoughnut(id,data,colorStart){
+    const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]).slice(0,12);
+    if(charts[id]) charts[id].destroy();
+    const ctx=document.getElementById(id);
+    if(!ctx||!entries.length) return;
+    const labels=entries.map(([k])=>k),vals=entries.map(([,v])=>v);
+    const tot=vals.reduce((a,b)=>a+b,0)||1;
+    charts[id]=new Chart(ctx.getContext('2d'),{type:'doughnut',data:{labels,datasets:[{data:vals,
+      backgroundColor:labels.map((_,i)=>PALETTE[(i+colorStart)%PALETTE.length]),borderWidth:0,hoverOffset:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{
+        legend:{display:true,position:'right',labels:{color:'#94a3b8',boxWidth:9,padding:6,font:{size:10}}},
+        tooltip:{backgroundColor:'#1c2030',borderColor:'#252a3a',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:6,
+          callbacks:{label:ctx2=>' '+ctx2.label+': '+fmt(ctx2.raw)+' ('+(ctx2.raw/tot*100).toFixed(1)+'%)'}},
+        datalabels:{display:ctx2=>(ctx2.dataset.data[ctx2.dataIndex]/tot)>0.05,color:'#fff',
+          font:{size:9,family:"'DM Mono',monospace",weight:'600'},formatter:v=>fmt(v)+'\n'+(v/tot*100).toFixed(1)+'%',textAlign:'center'}},
+        cutout:'52%'}});
+  }
+  makeDoughnut('reopenQueueChart',byQueue,1);
+  makeDoughnut('reopenL3Chart',byL3,4);
+}
+
+// ─── ACTIONABLE TAB ──────────────────────────────────────────────────────
+const PRIORITY_CFG={
+  CRITICAL:{color:'#ef4444',icon:'🚨'},
+  HIGH:    {color:'#eab308',icon:'⚠️'},
+  MEDIUM:  {color:'#3b82f6',icon:'📋'},
+  LOW:     {color:'#22c55e',icon:'✅'},
+};
+
+function renderActionSummary(items){
+  const counts={CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
+  items.forEach(it=>counts[it.priority]++);
+  const row=document.getElementById('actionSummaryRow');
+  if(!row) return;
+  const defs=[
+    {key:'CRITICAL',label:'Critical L3s', sub:'Immediate action needed',c:'#ef4444',bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.35)'},
+    {key:'HIGH',    label:'High Priority', sub:'Breach – act today',     c:'#eab308',bg:'rgba(234,179,8,.07)',bd:'rgba(234,179,8,.3)'},
+    {key:'MEDIUM',  label:'Medium Priority',sub:'Proactive follow-up',   c:'#3b82f6',bg:'rgba(59,130,246,.07)',bd:'rgba(59,130,246,.3)'},
+    {key:'LOW',     label:'Low Priority',  sub:'Within SLA, routine',    c:'#22c55e',bg:'rgba(34,197,94,.07)',bd:'rgba(34,197,94,.25)'},
+  ];
+  row.innerHTML=defs.map(d=>`<div class="action-kpi" style="background:${d.bg};border-color:${d.bd};border:1px solid ${d.bd};border-radius:12px;">
+    <div class="action-kpi-label" style="color:${d.c};">${d.key}</div>
+    <div class="action-kpi-value" style="color:${d.c};">${counts[d.key]}</div>
+    <div class="action-kpi-sub" style="color:${d.c};">${d.label}</div>
+    <div class="action-kpi-sub">${d.sub}</div>
+  </div>`).join('');
+}
+
+function renderActionItems(items){
+  const list=document.getElementById('actionItemsList');
+  if(!list) return;
+  if(!items.length){
+    list.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">No items match the selected filter.</div>';
+    document.getElementById('actionCountLabel').textContent='0 items';return;
+  }
+  document.getElementById('actionCountLabel').textContent=`Showing ${items.length} L3 group(s)`;
+  list.innerHTML=items.map((it,idx)=>{
+    const cfg=PRIORITY_CFG[it.priority]||PRIORITY_CFG.LOW;
+    const casePreview=(it.case_ids||[]).slice(0,60);
+    const caseExtra=(it.case_ids||[]).length-casePreview.length;
+    const ageTot=AGE_SEG_KEYS.reduce((s,k)=>s+(it.age_buckets[k]||0),0)||1;
+    const ageBar=AGE_SEG_KEYS.map((k,i)=>{
+      const v=it.age_buckets[k]||0;
+      const pct=(v/ageTot*100).toFixed(1);
+      return v?`<div class="age-mini-seg" style="width:${pct}%;background:${AGE_SEG_COLS[i]};" title="${k}: ${v}">${parseFloat(pct)>8?v:''}</div>`:'';
+    }).join('');
+    const themes=(it.note_themes||[]).map(t=>`<span class="theme-pill">${t}</span>`).join('');
+    return `<div class="action-item" id="aitem-${idx}" style="border-left:3px solid ${cfg.color};">
+      <div class="action-item-header" onclick="toggleActionItem(${idx})">
+        <span class="priority-badge pb-${it.priority}">${cfg.icon} ${it.priority}</span>
+        <span class="action-l3-name">${it.l3}</span>
+        <div class="action-meta">
+          <span class="action-meta-chip" style="color:var(--accent);">${fmt(it.total)} tickets</span>
+          ${it.breach_count?`<span class="action-meta-chip" style="color:#eab308;">⚠️ ${it.breach_count} breached</span>`:''}
+          ${it.critical_count?`<span class="action-meta-chip" style="color:#ef4444;">🔴 ${it.critical_count} critical</span>`:''}
+          <span class="action-meta-chip">Max: ${Math.round(it.max_age)}d · Avg: ${it.avg_age}d</span>
+          <span class="action-meta-chip" style="color:var(--muted);font-size:9px;">${it.l1} › ${it.l2}</span>
+        </div>
+        <span class="action-chevron">▼</span>
+      </div>
+      <div class="action-body">
+        <div class="action-text-box">${it.action}</div>
+        <div class="action-detail-grid">
+          <div class="card" style="padding:14px;border-top:2px solid ${cfg.color};">
+            <div class="card-title" style="margin-bottom:10px;"><span style="background:${cfg.color}"></span>Ageing Breakdown</div>
+            <div class="age-mini-bar">${ageBar}</div>
+            ${AGE_SEG_KEYS.map((k,i)=>{const v=it.age_buckets[k]||0;if(!v) return '';
+              return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;">
+                <div style="width:10px;height:10px;border-radius:2px;background:${AGE_SEG_COLS[i]};flex-shrink:0;"></div>
+                <span style="flex:1;color:var(--muted);">${k}</span>
+                <span style="font-family:'DM Mono',monospace;font-weight:600;color:var(--text);">${fmt(v)}</span>
+              </div>`;}).join('')}
+          </div>
+          <div class="card" style="padding:14px;">
+            <div class="card-title" style="margin-bottom:10px;"><span style="background:var(--accent4)"></span>Note Signals</div>
+            ${themes||'<span style="font-size:11px;color:var(--muted);">No specific signals found in notes.</span>'}
+            <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Within SLA</div>
+                <div style="font-family:'DM Mono',monospace;font-weight:700;color:#22c55e;font-size:20px;">${fmt(it.within_count)}</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">SLA Breached</div>
+                <div style="font-family:'DM Mono',monospace;font-weight:700;color:#ef4444;font-size:20px;">${fmt(it.breach_count)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="action-case-section">
+          <div class="action-case-title">📂 Case IDs (${(it.case_ids||[]).length} total · sorted by age ↓)</div>
+          <div class="case-id-grid">
+            ${casePreview.map(c=>`<span class="case-chip">${c}</span>`).join('')}
+            ${caseExtra>0?`<span class="case-chip" style="color:var(--muted);">+${caseExtra} more</span>`:''}
+          </div>
+          <div style="margin-top:8px;">
+            <button class="dl-btn" onclick="downloadL3CSV('${it.l3.replace(/'/g,"\\'")}')"
+              style="color:var(--accent3);border:1px solid rgba(16,185,129,.35);background:rgba(16,185,129,.08);padding:5px 12px;font-size:10px;font-weight:600;">
+              ⬇ Download ${it.l3} CSV
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.toggleActionItem=function(idx){const el=document.getElementById('aitem-'+idx);if(el)el.classList.toggle('open');};
+
+window.filterActions=function(priority,btn){
+  _activeFilter=priority;
+  document.querySelectorAll('.af-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const filtered=priority==='ALL'?_actionItems:_actionItems.filter(i=>i.priority===priority);
+  renderActionItems(filtered);
+};
+
+function renderActionableTab(data){
+  _actionItems=data.actionable_items||[];
+  renderActionSummary(_actionItems);
+  filterActions('ALL',document.querySelector('.af-btn[data-p="ALL"]'));
+}
+
+// ─── CSV DOWNLOADS ────────────────────────────────────────────────────────
+function toCSV(rows,cols){
+  const header=cols.join(',');
+  const body=rows.map(r=>cols.map(c=>{
+    let v=r[c]!==undefined?r[c]:'';
+    if(typeof v==='string'&&(v.includes(',')||v.includes('"')||v.includes('\n'))){v='"'+v.replace(/"/g,'""')+'"';}
+    return v;
+  }).join(',')).join('\n');
+  return header+'\n'+body;
+}
+
+function triggerDownload(csv,filename){
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+const EXPORT_COLS=['case_number','status','country','l1','l2','l3','queue','created_at','age_days','notes'];
+const today=()=>new Date().toISOString().slice(0,10).replace(/-/g,'');
+
+function downloadCSV(type){
+  if(!_globalDF.length) return;
+  let rows=_globalDF,fname='';
+  if(type==='all'){fname=`All_Tickets_${today()}.csv`;}
+  else if(type==='high_age'){rows=_globalDF.filter(r=>r.age_days!==null&&r.age_days>=3);fname=`HighAgeing_2plus_${today()}.csv`;}
+  else if(type==='reopen'){rows=_globalDF.filter(r=>r.is_reopen);fname=`Reopen_Tickets_${today()}.csv`;}
+  else if(type==='actionable'){
+    downloadActionableCSV('ALL');return;
+  }else if(type==='actionable_filtered'){
+    downloadActionableCSV(_activeFilter);return;
+  }
+  rows=rows.slice().sort((a,b)=>(b.age_days||0)-(a.age_days||0));
+  triggerDownload(toCSV(rows,EXPORT_COLS),fname);
+}
+
+function downloadSLABucketCSV(key){
+  const b=SLA_BREACHES.find(x=>x.key===key);
+  if(!b||!_globalDF.length) return;
+  let rows=_globalDF.filter(r=>{
+    const d=r.age_days;
+    if(d===null) return false;
+    return d>=b.min&&(b.max===null||d<=b.max);
+  }).sort((a,b2)=>(b2.age_days||0)-(a.age_days||0));
+  triggerDownload(toCSV(rows,EXPORT_COLS),`Pendency_${b.label.replace(/ /g,'_')}_${today()}.csv`);
+}
+
+function downloadAgeingCSV(minDay){
+  if(!_globalDF.length) return;
+  const rows=_globalDF.filter(r=>r.age_days!==null&&r.age_days>=minDay)
+    .sort((a,b)=>(b.age_days||0)-(a.age_days||0));
+  const labels={0:'All',3:'2plus',4:'3plus',6:'5plus',9:'8plus'};
+  const label=labels[minDay]||`Day${minDay}plus`;
+  triggerDownload(toCSV(rows,EXPORT_COLS),`WorkQueue_Pendency_${label}_${today()}.csv`);
+}
+
+function downloadActionableCSV(priority){
+  if(!_actionItems.length) return;
+  const items=priority==='ALL'?_actionItems:_actionItems.filter(i=>i.priority===priority);
+  const rows=[];
+  items.forEach(it=>{
+    (it.case_ids.length?it.case_ids:['']).forEach(cid=>{
+      const r=_globalDF.find(x=>String(x.case_number||'')==cid)||{};
+      rows.push({
+        Priority:it.priority,L3_Category:it.l3,L1_Category:it.l1,L2_Category:it.l2,
+        Case_ID:cid,Status:r.status||'',Work_Queue:r.queue||'',
+        Age_Days:r.age_days!==undefined?Math.round(r.age_days*10)/10:'',
+        Actionable:it.action,Note_Themes:(it.note_themes||[]).join('; '),Notes:r.notes||'',
+      });
+    });
+  });
+  const cols=['Priority','L3_Category','L1_Category','L2_Category','Case_ID','Status','Work_Queue','Age_Days','Actionable','Note_Themes','Notes'];
+  const label=priority==='ALL'?'All':priority;
+  triggerDownload(toCSV(rows,cols),`ActionableItems_${label}_${today()}.csv`);
+}
+
+window.downloadL3CSV=function(l3name){
+  const rows=_globalDF.filter(r=>r.l3===l3name).sort((a,b)=>(b.age_days||0)-(a.age_days||0));
+  const safe=l3name.replace(/[^a-zA-Z0-9\-_ ]/g,'_').slice(0,40);
+  triggerDownload(toCSV(rows,EXPORT_COLS),`Actionable_L3_${safe}_${today()}.csv`);
+};
+
+// ─── TAB SWITCHING ────────────────────────────────────────────────────────
+function switchTab(tab,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  btn.classList.add('active');
+}
+function switchSlaView(view,btn){
+  document.querySelectorAll('.sla-view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.sla-sub-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('slaview-'+view).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
